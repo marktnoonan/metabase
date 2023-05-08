@@ -6,6 +6,7 @@ import { t } from "ttag";
 
 import Button from "metabase/core/components/Button";
 import Radio from "metabase/core/components/Radio";
+import Toggle from "metabase/core/components/Toggle";
 
 import Visualization from "metabase/visualizations/components/Visualization";
 
@@ -22,6 +23,7 @@ import {
   getComputedSettings,
   getSettingsWidgets,
 } from "metabase/visualizations/lib/settings";
+import { isVirtualDashCard } from "metabase/dashboard/utils";
 
 import { keyForSingleSeries } from "metabase/visualizations/lib/settings/series";
 import { getSettingDefinitionsForColumn } from "metabase/visualizations/lib/settings/column";
@@ -39,6 +41,8 @@ import {
   ChartSettingsListContainer,
   ChartSettingsVisualizationContainer,
   ChartSettingsFooterRoot,
+  ChartSettingsFooterActions,
+  HideWhenEmptyContainer,
 } from "./ChartSettings.styled";
 
 // section names are localized
@@ -260,6 +264,10 @@ class ChartSettings extends Component {
     return null;
   };
 
+  handleChangeHideWhenEmpty = value => {
+    this.handleChangeSettings({ "dashcard.hide_empty": value });
+  };
+
   render() {
     const {
       className,
@@ -368,6 +376,9 @@ class ChartSettings extends Component {
         !currentSectionHasColumnSettings
       );
 
+    const isVirtualCard = isVirtualDashCard(dashcard);
+    const hideWhenEmpty = settings["dashcard.hide_empty"];
+
     // default layout with visualization
     return (
       <ChartSettingsRoot className={className}>
@@ -399,9 +410,22 @@ class ChartSettings extends Component {
               />
             </ChartSettingsVisualizationContainer>
             <ChartSettingsFooter
+              hideWhenEmpty={hideWhenEmpty}
+              onChangeHidenWhenEmpty={this.handleChangeHideWhenEmpty}
               onDone={this.handleDone}
               onCancel={this.handleCancel}
               onReset={onReset}
+              leftContent={
+                !isVirtualCard ? (
+                  <HideWhenEmptyContainer>
+                    <Toggle
+                      value={hideWhenEmpty}
+                      onChange={this.handleChangeHideWhenEmpty}
+                    />
+                    <label>{t`Hide when empty`}</label>
+                  </HideWhenEmptyContainer>
+                ) : null
+              }
             />
           </ChartSettingsPreview>
         )}
@@ -420,25 +444,28 @@ class ChartSettings extends Component {
   }
 }
 
-const ChartSettingsFooter = ({ onDone, onCancel, onReset }) => (
+const ChartSettingsFooter = ({ onDone, onCancel, onReset, leftContent }) => (
   <ChartSettingsFooterRoot>
-    {onReset && (
+    {leftContent}
+    <ChartSettingsFooterActions>
+      {onReset && (
+        <Button
+          borderless
+          icon="refresh"
+          data-metabase-event="Chart Settings;Reset"
+          onClick={onReset}
+        >{t`Reset to defaults`}</Button>
+      )}
       <Button
-        borderless
-        icon="refresh"
-        data-metabase-event="Chart Settings;Reset"
-        onClick={onReset}
-      >{t`Reset to defaults`}</Button>
-    )}
-    <Button
-      onClick={onCancel}
-      data-metabase-event="Chart Settings;Cancel"
-    >{t`Cancel`}</Button>
-    <Button
-      primary
-      onClick={onDone}
-      data-metabase-event="Chart Settings;Done"
-    >{t`Done`}</Button>
+        onClick={onCancel}
+        data-metabase-event="Chart Settings;Cancel"
+      >{t`Cancel`}</Button>
+      <Button
+        primary
+        onClick={onDone}
+        data-metabase-event="Chart Settings;Done"
+      >{t`Done`}</Button>
+    </ChartSettingsFooterActions>
   </ChartSettingsFooterRoot>
 );
 

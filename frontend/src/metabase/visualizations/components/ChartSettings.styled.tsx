@@ -75,9 +75,22 @@ export const ChartSettingsVisualizationContainer = styled.div`
 
 export const ChartSettingsFooterRoot = styled.div`
   display: flex;
-  justify-content: end;
+  justify-content: space-between;
+`;
+
+export const ChartSettingsFooterActions = styled.div`
+  display: flex;
+  margin-left: auto;
   padding: 1rem 2rem;
   ${Button} {
     margin-left: 1rem;
   }
+`;
+
+export const HideWhenEmptyContainer = styled.div`
+  padding: 0 2rem;
+  justify-self: start;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
 `;

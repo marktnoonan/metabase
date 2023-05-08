@@ -26,6 +26,7 @@ import {
 } from "metabase/lib/dashboard_grid";
 import { ContentViewportContext } from "metabase/core/context/ContentViewportContext";
 import { addUndo } from "metabase/redux/undo";
+import { isVirtualDashCard } from "metabase/dashboard/utils";
 import { DashboardCard } from "./DashboardGrid.styled";
 
 import GridLayout from "./grid/GridLayout";
@@ -35,6 +36,35 @@ import DashCard from "./DashCard";
 
 const mapDispatchToProps = { addUndo };
 
+const hasData = dashcardData => {
+  const queryResults = dashcardData
+    ? Object.values(dashcardData).filter(Boolean)
+    : [];
+
+  return (
+    queryResults.length > 0 &&
+    queryResults.every(queryResult => queryResult.data.rows.length > 0)
+  );
+};
+
+const shouldHide = (dashcard, dashcardData, wasVisible) => {
+  if (isVirtualDashCard(dashcard)) {
+    return false;
+  }
+
+  const queryResults = Object.values(dashcardData);
+  const isLoading =
+    queryResults.length > 0 && queryResults.every(result => result == null);
+  if (isLoading) {
+    return true;
+  }
+
+  return (
+    dashcard.visualization_settings["dashcard.hide_empty"] &&
+    !hasData(dashcardData)
+  );
+};
+
 class DashboardGrid extends Component {
   static contextType = ContentViewportContext;
 
@@ -42,8 +72,9 @@ class DashboardGrid extends Component {
     super(props, context);
 
     this.state = {
-      layouts: this.getLayouts(props),
-      dashcards: this.getSortedDashcards(props),
+      hiddenCardIds: {},
+      layouts: this.getLayouts(props.dashboard.ordered_cards),
+      dashcards: this.getSortedDashcards(props.dashboard.ordered_cards),
       addSeriesModalDashCard: null,
       isDragging: false,
       isAnimationPaused: true,
@@ -89,10 +120,13 @@ class DashboardGrid extends Component {
     clearTimeout(this._pauseAnimationTimer);
   }
 
+  // TODO: component did update
   UNSAFE_componentWillReceiveProps(nextProps) {
+    const cards = this.getVisibleCards(nextProps);
+
     this.setState({
-      dashcards: this.getSortedDashcards(nextProps),
-      layouts: this.getLayouts(nextProps),
+      dashcards: this.getSortedDashcards(cards),
+      layouts: this.getLayouts(cards),
     });
   }
 
@@ -104,11 +138,11 @@ class DashboardGrid extends Component {
       return;
     }
 
-    const { dashboard, setMultipleDashCardAttributes } = this.props;
+    const { setMultipleDashCardAttributes } = this.props;
     const changes = [];
 
     layout.forEach(layoutItem => {
-      const dashboardCard = dashboard.ordered_cards.find(
+      const dashboardCard = this.getVisibleCards().find(
         card => String(card.id) === layoutItem.i,
       );
 
@@ -137,25 +171,22 @@ class DashboardGrid extends Component {
     }
   };
 
-  getSortedDashcards(props) {
-    return (
-      props.dashboard &&
-      props.dashboard.ordered_cards.sort((a, b) => {
-        if (a.row < b.row) {
-          return -1;
-        }
-        if (a.row > b.row) {
-          return 1;
-        }
-        if (a.col < b.col) {
-          return -1;
-        }
-        if (a.col > b.col) {
-          return 1;
-        }
-        return 0;
-      })
-    );
+  getSortedDashcards(cards) {
+    return cards.sort((a, b) => {
+      if (a.row < b.row) {
+        return -1;
+      }
+      if (a.row > b.row) {
+        return 1;
+      }
+      if (a.col < b.col) {
+        return -1;
+      }
+      if (a.col > b.col) {
+        return 1;
+      }
+      return 0;
+    });
   }
 
   getLayoutForDashCard(dashcard) {
@@ -174,8 +205,20 @@ class DashboardGrid extends Component {
     };
   }
 
-  getLayouts({ dashboard }) {
-    const desktop = dashboard.ordered_cards.map(this.getLayoutForDashCard);
+  getVisibleCards = (props = this.props) => {
+    const allCards = props.dashboard.ordered_cards;
+    const dashcardData = props.dashcardData;
+    return allCards.filter(
+      card => !shouldHide(card, dashcardData[card.id], false, true),
+    );
+  };
+
+  getLayouts(cards) {
+    const hiddenCardIds = this?.state?.hiddenCardIds ?? {};
+    const desktop = cards
+      .filter(card => !hiddenCardIds[card.id])
+      .map(this.getLayoutForDashCard);
+
     const mobile = generateMobileLayout({
       desktopLayout: desktop,
       defaultCardHeight: 6,
@@ -280,6 +323,14 @@ class DashboardGrid extends Component {
     }
   };
 
+  handleCardVisibilityChange = (isVisible, cardId) => {
+    const hiddenCardIds = { ...this.state.hiddenCardIds };
+    hiddenCardIds[cardId] = isVisible;
+    this.setState({
+      hiddenCardIds,
+    });
+  };
+
   renderDashCard(dc, { isMobile, gridItemWidth, totalNumGridCols }) {
     return (
       <DashCard
@@ -298,6 +349,7 @@ class DashboardGrid extends Component {
         isNightMode={this.props.isNightMode}
         isMobile={isMobile}
         isPublic={this.props.isPublic}
+        onVisibilityChange={this.handleCardVisibilityChange}
         onRemove={this.onDashCardRemove.bind(this, dc)}
         onAddSeries={this.onDashCardAddSeries.bind(this, dc)}
         onUpdateVisualizationSettings={this.props.onUpdateDashCardVisualizationSettings.bind(
@@ -349,7 +401,7 @@ class DashboardGrid extends Component {
   );
 
   renderGrid() {
-    const { dashboard, width } = this.props;
+    const { width } = this.props;
     const { layouts } = this.state;
     const rowHeight = this.getRowHeight();
     return (
@@ -370,7 +422,7 @@ class DashboardGrid extends Component {
         onDragStop={this.onDragStop}
         isEditing={this.isEditingLayout}
         compactType="vertical"
-        items={dashboard.ordered_cards}
+        items={this.getVisibleCards()}
         itemRenderer={this.renderGridItem}
       />
     );
