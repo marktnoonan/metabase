@@ -11,6 +11,7 @@ import {
   closeNavigationSidebar,
   openCollectionMenu,
   visitCollection,
+  openUnpinnedItemMenu,
 } from "e2e/support/helpers";
 import { USERS, USER_GROUPS } from "e2e/support/cypress_data";
 import { displaySidebarChildOf } from "./helpers/e2e-collections-sidebar.js";
@@ -22,6 +23,7 @@ describe("scenarios > collection defaults", () => {
   beforeEach(() => {
     restore();
     cy.signInAsAdmin();
+    cy.intercept("GET", "/api/**/items?pinned_state*").as("getPinnedItems");
   });
 
   describe("new collection modal", () => {
@@ -439,10 +441,15 @@ describe("scenarios > collection defaults", () => {
           cy.icon("dash").should("exist");
           cy.icon("check").should("exist");
 
+          // Pin one item
+          openUnpinnedItemMenu("Orders, Count");
+          popover().findByText("Pin this").click();
+          cy.wait("@getPinnedItems");
+
           // Select all
           cy.findByLabelText("Select all items").click();
           cy.icon("dash").should("not.exist");
-          cy.findByText("5 items selected");
+          cy.findByText("4 items selected");
 
           // Deselect all
           cy.findByLabelText("Select all items").click();
