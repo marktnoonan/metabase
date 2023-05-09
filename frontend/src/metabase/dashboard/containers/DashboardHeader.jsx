@@ -33,6 +33,7 @@ import {
 import { hasDatabaseActionsEnabled } from "metabase/dashboard/utils";
 import { saveDashboardPdf } from "metabase/visualizations/lib/save-dashboard-pdf";
 
+import { getSetting } from "metabase/selectors/settings";
 import Header from "../components/DashboardHeader";
 import { SIDEBAR_NAME } from "../constants";
 import {
@@ -45,6 +46,9 @@ const mapStateToProps = (state, props) => {
     isBookmarked: getIsBookmarked(state, props),
     isNavBarOpen: getIsNavbarOpen(state),
     isShowingDashboardInfoSidebar: getIsShowDashboardInfoSidebar(state),
+    isHomepageDashboard:
+      getSetting(state, "custom-homepage") &&
+      getSetting(state, "custom-homepage-dashboard") === props.dashboard?.id,
   };
 };
 
@@ -440,6 +444,7 @@ class DashboardHeader extends Component {
       isAdditionalInfoVisible,
       setDashboardAttribute,
       setSidebar,
+      isHomepageDashboard,
     } = this.props;
 
     const hasLastEditInfo = dashboard["last-edit-info"] != null;
@@ -457,7 +462,11 @@ class DashboardHeader extends Component {
         isNavBarOpen={this.props.isNavBarOpen}
         headerButtons={this.getHeaderButtons()}
         editWarning={this.getEditWarning(dashboard)}
-        editingTitle={t`You're editing this dashboard.`}
+        editingTitle={t`You're editing this dashboard.`.concat(
+          isHomepageDashboard
+            ? t` Remember that this dashboard is set as homepage.`
+            : "",
+        )}
         editingButtons={this.getEditingButtons()}
         setDashboardAttribute={setDashboardAttribute}
         onLastEditInfoClick={() => setSidebar({ name: SIDEBAR_NAME.info })}
