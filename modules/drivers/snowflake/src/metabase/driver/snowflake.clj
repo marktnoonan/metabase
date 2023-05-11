@@ -15,9 +15,9 @@
    [metabase.driver.sql-jdbc.execute.legacy-impl :as sql-jdbc.legacy]
    [metabase.driver.sql-jdbc.sync :as sql-jdbc.sync]
    [metabase.driver.sql-jdbc.sync.common :as sql-jdbc.sync.common]
-   [metabase.driver.sql-jdbc.sync.describe-table :as sql-jdbc.describe-table]
+   [metabase.driver.sql-jdbc.sync.describe-table
+    :as sql-jdbc.describe-table]
    [metabase.driver.sql.query-processor :as sql.qp]
-   [metabase.driver.sql.query-processor.util :as sql.qp.util]
    [metabase.driver.sql.util :as sql.u]
    [metabase.driver.sql.util.unprepare :as unprepare]
    [metabase.driver.sync :as driver.s]
@@ -37,7 +37,8 @@
    (java.io File)
    (java.nio.charset StandardCharsets)
    (java.sql Connection DatabaseMetaData ResultSet Types)
-   (java.time OffsetDateTime ZonedDateTime)))
+   (java.time OffsetDateTime ZonedDateTime)
+   (net.snowflake.client.jdbc SnowflakeStatement)))
 
 (set! *warn-on-reflection* true)
 
@@ -567,3 +568,28 @@
 (defmethod qp.util/set-role-statement :snowflake
   [_ role]
   (format "USE ROLE %s;" role))
+
+#_(defmethod sql-jdbc.execute/statement :snowflake
+    [_ ^Connection conn]
+    (let [stmt (.createStatement conn
+                                 ResultSet/TYPE_FORWARD_ONLY
+                                 ResultSet/CONCUR_READ_ONLY
+                                 ResultSet/CLOSE_CURSORS_AT_COMMIT)]
+      (def stmt stmt)
+      (.unwrap stmt)
+      #_(def unwrapped
+          (.unwrap stmt (.class SnowflakeStatement)))
+      (try
+        (try
+          (.setFetchDirection stmt ResultSet/FETCH_FORWARD)
+          (catch Throwable e
+            (log/debug e (trs "Error setting statement fetch direction to FETCH_FORWARD"))))
+        (try
+          (when (zero? (.getFetchSize stmt))
+            (.setFetchSize stmt (sql-jdbc.execute/sql-jdbc-fetch-size)))
+          (catch Throwable e
+            (log/debug e (trs "Error setting statement fetch size to fetch-size"))))
+        stmt
+        (catch Throwable e
+          (.close stmt)
+          (throw e)))))
