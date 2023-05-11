@@ -101,8 +101,8 @@ export const getGroupedAndSortedActions = (
 export const getGALabelForAction = (action: ClickActionBase) =>
   action ? `${action.section || ""}:${action.name || ""}` : null;
 
-const getFilterValueType = (actions: RegularClickAction[]) =>
-  actions[0]?.extra?.().valueType;
+const getFilterValueType = (actions: RegularClickAction[]): string =>
+  actions[0]?.extra?.().valueType as string;
 
 export const getFilterSectionTitle = (actions: RegularClickAction[]) => {
   const valueType = getFilterValueType(actions);
@@ -153,7 +153,7 @@ export const getSectionContentDirection = (
     case "filter": {
       const valueType = getFilterValueType(actions);
 
-      if (valueType === "boolean" || valueType === "numeric") {
+      if (["boolean", "numeric", "null"].includes(valueType)) {
         return "row";
       }
     }
